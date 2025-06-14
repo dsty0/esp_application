@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "1088153520864",
+    "firebase_url": "https://esp-database-70799-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "esp-database-70799",
+    "storage_bucket": "esp-database-70799.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1088153520864:android:6b7eb93e575990e9579e85",
+        "android_client_info": {
+          "package_name": "com.example.esp_aplicaton"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBckWEHcBIsDN7bQVYHC1Acix2-QdLJg3o"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
