@@ -1,3 +1,4 @@
+import 'package:esp_aplicaton/page/humidity_detail_page.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
@@ -5,6 +6,15 @@ import 'package:geolocator/geolocator.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'setting_page.dart';
+import 'temperature_detail_page.dart';
+import 'humidity_detail_page.dart';
+import 'light_detail_page.dart';
+import 'moisture_detail_page.dart';
+import 'info_page.dart';
+
+String tokenId = "DST-TYL230904";
+
 
 class FirebasePage extends StatefulWidget {
   @override
@@ -17,12 +27,15 @@ class _FirebasePageState extends State<FirebasePage> {
   final dbRef = FirebaseDatabase.instance.ref();
   Map<String, dynamic> data = {};
   LatLng _currentPosition = LatLng(-7.2575, 112.7521); // Default: Surabaya
+  LatLng? _devicePosition; // Posisi device dari Firebase
+
 
   @override
   void initState() {
     super.initState();
     loginAndListenData();
     getCurrentLocation();
+    getDeviceLocation(); // Ambil posisi device juga
   }
 
   Future<void> loginAndListenData() async {
@@ -35,6 +48,16 @@ class _FirebasePageState extends State<FirebasePage> {
             final raw = snapshot.value as Map<dynamic, dynamic>;
             final mapped = raw.map((key, value) =>
                 MapEntry(key.toString(), Map<String, dynamic>.from(value)));
+
+            final latestKey = mapped.keys.toList()..sort((a, b) => b.compareTo(a));
+            final latestData = mapped[latestKey.first]!;
+
+            if (!latestData.containsKey('timestamp') || latestData['timestamp'] == null) {
+              final now = DateTime.now();
+              latestData['timestamp'] = now.toIso8601String();
+              mapped[latestKey.first] = latestData;
+            }
+
             setState(() {
               data = mapped;
             });
@@ -73,6 +96,96 @@ class _FirebasePageState extends State<FirebasePage> {
     }
   }
 
+Future<void> getDeviceLocation() async {
+  try {
+    final snapshot = await dbRef.child('esp-data/$tokenId').get();
+    if (snapshot.exists) {
+      final raw = snapshot.value as Map<dynamic, dynamic>;
+
+      // Urutkan key unixtime dari terbaru ke terlama
+      final sortedKeys = raw.keys.toList()
+        ..sort((a, b) => b.toString().compareTo(a.toString()));
+
+      for (final key in sortedKeys) {
+        final entry = raw[key];
+        if (entry is Map) {
+          final data = Map<String, dynamic>.from(entry);
+          final lat = double.tryParse(data['lat']?.toString() ?? '');
+          final lng = double.tryParse(data['lon']?.toString() ?? '');
+
+          if (lat != null && lng != null) {
+            setState(() {
+              _devicePosition = LatLng(lat, lng);
+            });
+            return; // Stop jika sudah ketemu data valid
+          }
+        }
+      }
+    }
+  } catch (e) {
+    print("❌ Error reading device location: $e");
+  }
+}
+
+
+
+String formatTimestamp(dynamic ts) {
+  if (ts == null) return "--";
+
+  if (ts is int) {
+    final dt = DateTime.fromMillisecondsSinceEpoch(ts * 1000).toLocal();
+    return "${dt.day.toString().padLeft(2, '0')} ${_monthName(dt.month)} ${dt.year}, "
+           "${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}";
+  } else if (ts is String) {
+    try {
+      final parsed = int.tryParse(ts);
+      if (parsed != null) {
+        final dt = DateTime.fromMillisecondsSinceEpoch(parsed * 1000).toLocal();
+        return "${dt.day.toString().padLeft(2, '0')} ${_monthName(dt.month)} ${dt.year}, "
+               "${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}";
+      }
+
+      final dt = DateTime.tryParse(ts)?.toLocal();
+      if (dt != null) {
+        return "${dt.day.toString().padLeft(2, '0')} ${_monthName(dt.month)} ${dt.year}, "
+               "${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}";
+      }
+    } catch (_) {}
+    return ts;
+  }
+
+  return "--";
+}
+
+
+
+  String _monthName(int month) {
+    const months = [
+      "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+    ];
+    return months[month - 1];
+  }
+
+  String getGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour >= 0 && hour <= 12) {
+      return 'Hello, Good Morning!';
+    } else if (hour > 12 && hour <= 18) {
+      return 'Hello, Good Afternoon!';
+    } else {
+      return 'Hello, Good Evening!';
+    }
+  }
+
+  String getUserName() {
+    final user = auth.currentUser;
+    if (user != null && user.email != null) {
+      return user.email!.split('@').first;
+    }
+    return "User";
+  }
+
   @override
   Widget build(BuildContext context) {
     final sortedKeys = data.keys.toList()..sort((a, b) => b.compareTo(a));
@@ -82,31 +195,65 @@ class _FirebasePageState extends State<FirebasePage> {
       body: Column(
         children: [
           Container(
-            padding: EdgeInsets.only(top: 50, left: 20, bottom: 10),
-            alignment: Alignment.centerLeft,
+            padding: EdgeInsets.only(top: 50, left: 20, right: 20, bottom: 10),
             child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                CircleAvatar(
-                  backgroundImage: AssetImage("lib/assets/images/image.png"),
-                  radius: 25,
-                ),
-                SizedBox(width: 10),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                Row(
                   children: [
-                    Text("Hello, Good morning!",
-                        style: TextStyle(fontWeight: FontWeight.bold)),
-                    Text("Dani"),
+                 CircleAvatar(
+  backgroundColor: const Color(0xFF01AB96),
+  radius: 25,
+  child: Icon(
+    Icons.person,
+    color: const Color.fromARGB(221, 255, 255, 255),
+    size: 30,
+  ),
+),
+
+                    SizedBox(width: 10),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(getGreeting(), style: TextStyle(fontWeight: FontWeight.bold)),
+                        Text(getUserName()),
+                      ],
+                    ),
                   ],
+                ),
+                Container(
+                  decoration: BoxDecoration(
+                    color: Color(0xFF01AB96),
+                    shape: BoxShape.rectangle,
+                    borderRadius: BorderRadius.circular(15),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.2),
+                        blurRadius: 4,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: IconButton(
+                    icon: Icon(Icons.settings, color: Colors.white),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => SettingPage()),
+                      );
+                    },
+                  ),
                 ),
               ],
             ),
           ),
+
+          // Map Section
           Stack(
             children: [
               Container(
                 margin: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                height: 240,
+                height: 260,
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(0),
                   child: FlutterMap(
@@ -119,25 +266,42 @@ class _FirebasePageState extends State<FirebasePage> {
                       TileLayer(
                         urlTemplate:
                             'https://cartodb-basemaps-a.global.ssl.fastly.net/light_all/{z}/{x}/{y}@4x.png',
-                        userAgentPackageName: 'com.example.app',
+                        userAgentPackageName: 'com.esp.app',
                       ),
                       MarkerLayer(
-                        markers: [
-                          Marker(
-                            point: _currentPosition,
-                            width: 40,
-                            height: 40,
-                            child:
-                                Icon(Icons.location_on, color: Colors.red, size: 30),
-                          ),
-                        ],
+                    markers: [
+                      // Marker lokasi user
+                      Marker(
+                        point: _currentPosition,
+                        width: 40,
+                        height: 40,
+                        child: Icon(
+                          Icons.location_on,
+                          color: const Color(0xFF01AB96),
+                          size: 30,
+                        ),
                       ),
+                      // Marker lokasi device (jika tersedia)
+                      if (_devicePosition != null)
+                        Marker(
+                          point: _devicePosition!,
+                          width: 40,
+                          height: 40,
+                          child: Icon(
+                            Icons.sensors,
+                            color: Colors.redAccent,
+                            size: 30,
+                          ),
+                        ),
+                    ],
+                  ),
+
                     ],
                   ),
                 ),
               ),
               Positioned(
-                top: 20,
+                bottom: 20,
                 right: 30,
                 child: Container(
                   decoration: BoxDecoration(
@@ -152,7 +316,7 @@ class _FirebasePageState extends State<FirebasePage> {
                     ],
                   ),
                   child: IconButton(
-                    icon: Icon(Icons.my_location, color: Colors.black87),
+                    icon: Icon(Icons.my_location, color: const Color(0xFF01AB96)),
                     onPressed: () {
                       _mapController.move(_currentPosition, 14);
                     },
@@ -161,6 +325,47 @@ class _FirebasePageState extends State<FirebasePage> {
               ),
             ],
           ),
+
+          // Data Header
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Data Sensor',
+                      style: GoogleFonts.lexend(
+                        fontSize: 16,
+                        color: const Color(0xDD181818),
+                      ),
+                    ),
+                    SizedBox(height: 1),
+                    Container(
+                      height: 2,
+                      width: 40,
+                      color: const Color(0xFF01AB96),
+                    ),
+                  ],
+                ),
+Text(
+  sortedKeys.isNotEmpty
+      ? 'Last updated : ${formatTimestamp(sortedKeys.first)}'
+
+      : 'Last updated : --',
+  style: GoogleFonts.lexend(
+    fontSize: 12,
+    color: const Color(0xDD181818),
+  ),
+),
+
+              ],
+            ),
+          ),
+
+          // Data Cards
           Expanded(
             child: GridView.count(
               padding: EdgeInsets.all(15),
@@ -169,38 +374,111 @@ class _FirebasePageState extends State<FirebasePage> {
               mainAxisSpacing: 10,
               childAspectRatio: 1.42,
               children: [
-                sensorCard("Temperature", "${latest['suhu'] ?? '--'}°C", "lib/assets/images/temperature.png"),
-                sensorCard("Humidity", "${latest['kelembapan'] ?? '--'}%", "lib/assets/images/humidity.png"),
-                sensorCard("Light", "${latest['cahaya'] ?? '--'}Cd", "lib/assets/images/light.png"),
-                sensorCard("Moisture", "${latest['soil'] ?? '--'}%", "lib/assets/images/soil.png"),
+               sensorCard(
+  "Temperature", 
+  "${latest['suhu'] ?? '--'}°C",
+  "lib/assets/images/temperature.png", 
+  formatTimestamp(latest['timestamp']),
+  onTap: () {
+
+Navigator.push(
+  context,
+  MaterialPageRoute(
+    builder: (context) => TemperatureDetailPage(tokenId: tokenId),
+  ),
+);
+
+  },
+),
+               sensorCard("Humidity", "${latest['kelembapan'] ?? '--'} RH",
+  "lib/assets/images/humidity.png", 
+  formatTimestamp(latest['timestamp']),
+  onTap: () {
+
+Navigator.push(
+  context,
+  MaterialPageRoute(
+    builder: (context) => HumidityDetailPage(tokenId: tokenId),
+  ),
+);
+
+  },
+),
+               sensorCard("Light", "${latest['cahaya'] ?? '--'} Lux",
+  "lib/assets/images/light.png", 
+  formatTimestamp(latest['timestamp']),
+  onTap: () {
+
+Navigator.push(
+  context,
+  MaterialPageRoute(
+    builder: (context) => LightDetailPage(tokenId: tokenId),
+  ),
+);
+
+  },
+),
+               sensorCard("Moisture", "${latest['soil'] ?? '--'}%",
+  "lib/assets/images/soil.png", 
+  formatTimestamp(latest['timestamp']),
+  onTap: () {
+
+Navigator.push(
+  context,
+  MaterialPageRoute(
+    builder: (context) => MoistureDetailPage(tokenId: tokenId),
+  ),
+);
+
+  },
+),
               ],
             ),
           ),
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: 1,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.settings), label: ''),
-          BottomNavigationBarItem(icon: Icon(Icons.home, color: Colors.green), label: ''),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: ''),
-        ],
-      ),
+  currentIndex: 1,
+  onTap: (index) {
+    if (index == 0) {
+      // Do nothing or go to home
+    } else if (index == 1) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => InfoPage()),
+      );
+    }
+  },
+  items: const [
+    BottomNavigationBarItem(
+      icon: Icon(Icons.home, color: Color(0xFF01AB96)), label: 'Home'),
+    BottomNavigationBarItem(
+      icon: Icon(Icons.info_sharp, color: Color.fromARGB(255, 75, 75, 75)), label: 'Info'),
+  ],
+),
+
     );
   }
 
-  Widget sensorCard(String title, String value, String assetPath) {
-    return Container(
+  Widget sensorCard(
+  String title,
+  String value,
+  String assetPath,
+  String timestamp, {
+  VoidCallback? onTap, // Tambahkan onTap opsional
+}) {
+  return GestureDetector(
+    onTap: onTap, // Pasang di GestureDetector
+    child: Container(
       width: 280,
       height: 260,
       decoration: BoxDecoration(
-        color: Colors.teal[400],
-        border: Border.all(color: Colors.white, width: 0.6),
+        color: const Color(0xFF01AB96),
         borderRadius: BorderRadius.circular(10),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.6),
-            blurRadius: 2,
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 1,
             offset: Offset(1, 1),
           ),
         ],
@@ -208,10 +486,9 @@ class _FirebasePageState extends State<FirebasePage> {
       child: Padding(
         padding: const EdgeInsets.all(18),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              mainAxisSize: MainAxisSize.min,
               children: [
                 Image.asset(assetPath, width: 34, height: 34),
                 SizedBox(width: 6),
@@ -219,25 +496,38 @@ class _FirebasePageState extends State<FirebasePage> {
                   title,
                   style: GoogleFonts.lexend(
                     color: Colors.white,
-                    fontSize: 20,
+                    fontSize: 19,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
             ),
             SizedBox(height: 10),
-            Text(
-              value,
-              style: GoogleFonts.lexend(
-                color: Colors.white,
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
+            Center(
+              child: Text(
+                value,
+                style: GoogleFonts.lexend(
+                  color: Colors.white,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-              textAlign: TextAlign.center,
             ),
+            // Spacer(),
+            // Align(
+            //   alignment: Alignment.bottomRight,
+            //   child: Text(
+            //     timestamp,
+            //     style: GoogleFonts.lexend(
+            //       color: Colors.white70,
+            //       fontSize: 10,
+            //     ),
+            //   ),
+            // ),
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }
