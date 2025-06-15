@@ -169,7 +169,35 @@ void listenDeviceLocation() {
 }
 
 
+IconData getBatteryIcon(double voltage) {
+  if (voltage >= 4.0) return Icons.battery_full;
+  if (voltage >= 3.9) return Icons.battery_6_bar;
+  if (voltage >= 3.8) return Icons.battery_5_bar;
+  if (voltage >= 3.7) return Icons.battery_4_bar;
+  if (voltage >= 3.6) return Icons.battery_3_bar;
+  if (voltage >= 3.5) return Icons.battery_2_bar;
+  if (voltage >= 3.4) return Icons.battery_1_bar;
+  return Icons.battery_alert;
+}
 
+Icon getSignalIcon(int signalStrength) {
+  Color color;
+  if (signalStrength >= 75) {
+    color = Colors.green;
+  } else if (signalStrength >= 50) {
+    color = Colors.lightGreen;
+  } else if (signalStrength >= 25) {
+    color = Colors.orange;
+  } else {
+    color = Colors.red;
+  }
+
+  return Icon(
+    Icons.network_cell,
+    size: 16,
+    color: color,
+  );
+}
 
 String formatTimestamp(dynamic ts) {
   if (ts == null) return "--";
@@ -394,40 +422,43 @@ Padding(
         ],
       ),
       Row(
-        children: [
-          Text(
-            sortedKeys.isNotEmpty
-                ? "Updated: ${formatTimestamp(sortedKeys.first)}"
-                : '--',
-            style: GoogleFonts.lexend(
-              fontSize: 12,
-              color: const Color(0xDD181818),
-            ),
-          ),
-                    SizedBox(width: 12),
-          Icon(Icons.battery_full, size: 16, color: const Color(0xFFCCCCCC)),
-          SizedBox(width: 4),
-          Text(
-            "${latest['battery'] ?? '--'} V",
-            style: GoogleFonts.lexend(
-              fontSize: 12,
-              color: const Color(0xDD181818),
-            ),
-          ),
-          SizedBox(width: 12),
-          Icon(Icons.network_cell, size: 16, color: const Color(0xFFCCCCCC)),
-          SizedBox(width: 4),
-          Text(
-            "${latest['signal'] ?? '--'}",
-            style: GoogleFonts.lexend(
-              fontSize: 12,
-              color: const Color(0xDD181818),
-            ),
-          ),
-                    SizedBox(width: 12),
-
-        ],
+  children: [
+    Icon(
+      getBatteryIcon(double.tryParse(latest['battery']?.toString() ?? '0') ?? 0),
+      size: 16,
+      color: const Color.fromARGB(255, 184, 184, 184),
+    ),
+    SizedBox(width: 4),
+    Text(
+      "${latest['battery'] ?? '--'} V",
+      style: GoogleFonts.lexend(
+        fontSize: 12,
+        color: const Color(0xDD181818),
       ),
+    ),
+    SizedBox(width: 12),
+getSignalIcon(int.tryParse(latest['signal']?.toString() ?? '0') ?? 0),
+    SizedBox(width: 4),
+    Text(
+      "${latest['signal'] ?? '--'}%",
+      style: GoogleFonts.lexend(
+        fontSize: 12,
+        color: const Color(0xDD181818),
+      ),
+    ),
+    SizedBox(width: 12),
+    Text(
+      sortedKeys.isNotEmpty
+          ? "Last updated: ${formatTimestamp(sortedKeys.first)}"
+          : '--',
+      style: GoogleFonts.lexend(
+        fontSize: 12,
+        color: const Color(0xDD181818),
+      ),
+    ),
+  ],
+),
+
     ],
   ),
 ),
