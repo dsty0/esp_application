@@ -1,4 +1,3 @@
-import 'package:esp_aplicaton/page/humidity_detail_page.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
@@ -11,22 +10,21 @@ import 'package:esp_aplicaton/page/temperature_detail_page.dart';
 import 'package:esp_aplicaton/page/humidity_detail_page.dart';
 import 'package:esp_aplicaton/page/light_detail_page.dart';
 import 'package:esp_aplicaton/page/moisture_detail_page.dart';
-import 'package:esp_aplicaton/page/info_page.dart';
 
 String tokenId = "DST-TYL230904";
 
 
-class FirebasePage extends StatefulWidget {
-  @override
-  _FirebasePageState createState() => _FirebasePageState();
-}
+  class FirebasePage extends StatefulWidget {
+    @override
+    _FirebasePageState createState() => _FirebasePageState();
+  }
 
-class _FirebasePageState extends State<FirebasePage> {
-  final MapController _mapController = MapController();
-  final auth = FirebaseAuth.instance;
-  final dbRef = FirebaseDatabase.instance.ref();
-  Map<String, dynamic> data = {};
-  LatLng _currentPosition = LatLng(-7.2575, 112.7521); // Default: Surabaya
+  class _FirebasePageState extends State<FirebasePage> {
+    final MapController _mapController = MapController();
+    final auth = FirebaseAuth.instance;
+    final dbRef = FirebaseDatabase.instance.ref();
+    Map<String, dynamic> data = {};
+    LatLng _currentPosition = LatLng(-7.2575, 112.7521); // Default: Surabaya
   LatLng? _devicePosition; // Posisi device dari Firebase
 
 
@@ -35,8 +33,8 @@ class _FirebasePageState extends State<FirebasePage> {
     super.initState();
     loginAndListenData();
     getCurrentLocation();
-    // getDeviceLocation(); // Ambil posisi device juga
-    listenDeviceLocation(); // 🔥 Auto-update posisi device
+    // getDeviceLocation();
+    listenDeviceLocation();
   }
 
   Future<void> loginAndListenData() async {
@@ -97,137 +95,135 @@ class _FirebasePageState extends State<FirebasePage> {
     }
   }
 
-Future<void> getDeviceLocation() async {
-  try {
-    final snapshot = await dbRef.child('esp-data/$tokenId').get();
-    if (snapshot.exists) {
-      final raw = snapshot.value as Map<dynamic, dynamic>;
-      final sortedKeys = raw.keys.toList()
-        ..sort((a, b) => b.toString().compareTo(a.toString()));
-
-      for (final key in sortedKeys) {
-        final entry = raw[key];
-        if (entry is Map) {
-          final data = Map<String, dynamic>.from(entry);
-          final lat = double.tryParse(data['lat']?.toString() ?? '');
-          final lng = double.tryParse(data['lon']?.toString() ?? '');
-
-          print("🧭 Checking key: $key, lat: $lat, lon: $lng");
-
-          if (lat != null && lng != null) {
-            print("✅ Found device location: $lat, $lng");
-            setState(() {
-              _devicePosition = LatLng(lat, lng);
-            });
-            return;
-          }
-        }
-      }
-    } else {
-      print("⚠️ Data not found at: esp-data/$tokenId");
-    }
-  } catch (e) {
-    print("❌ Error reading device location: $e");
-  }
-}
-
-void listenDeviceLocation() {
-  dbRef.child('esp-data/$tokenId').onValue.listen((event) {
-    final snapshot = event.snapshot;
-    if (snapshot.exists) {
-      final raw = snapshot.value as Map<dynamic, dynamic>;
-      final sortedKeys = raw.keys.toList()
-        ..sort((a, b) => b.toString().compareTo(a.toString()));
-
-      for (final key in sortedKeys) {
-        final entry = raw[key];
-        if (entry is Map) {
-          final data = Map<String, dynamic>.from(entry);
-          final lat = double.tryParse(data['lat']?.toString() ?? '');
-          final lng = double.tryParse(data['lon']?.toString() ?? '');
-
-          if (lat != null && lng != null) {
-            final newPosition = LatLng(lat, lng);
-
-            // Hanya update jika lokasi berbeda dari sebelumnya
-            if (_devicePosition == null ||
-                _devicePosition!.latitude != lat ||
-                _devicePosition!.longitude != lng) {
-              setState(() {
-                _devicePosition = newPosition;
-              });
-
-              // Pindahkan kamera ke lokasi device
-              _mapController.move(newPosition, _mapController.camera.zoom);
-            }
-            return;
-          }
-        }
-      }
-    }
-  });
-}
-
-
-IconData getBatteryIcon(double voltage) {
-  if (voltage >= 4.0) return Icons.battery_full;
-  if (voltage >= 3.9) return Icons.battery_6_bar;
-  if (voltage >= 3.8) return Icons.battery_5_bar;
-  if (voltage >= 3.7) return Icons.battery_4_bar;
-  if (voltage >= 3.6) return Icons.battery_3_bar;
-  if (voltage >= 3.5) return Icons.battery_2_bar;
-  if (voltage >= 3.4) return Icons.battery_1_bar;
-  return Icons.battery_alert;
-}
-
-Icon getSignalIcon(int signalStrength) {
-  Color color;
-  if (signalStrength >= 75) {
-    color = Colors.green;
-  } else if (signalStrength >= 50) {
-    color = Colors.lightGreen;
-  } else if (signalStrength >= 25) {
-    color = Colors.orange;
-  } else {
-    color = Colors.red;
-  }
-
-  return Icon(
-    Icons.network_cell,
-    size: 16,
-    color: color,
-  );
-}
-
-String formatTimestamp(dynamic ts) {
-  if (ts == null) return "--";
-
-  if (ts is int) {
-    final dt = DateTime.fromMillisecondsSinceEpoch(ts * 1000).toLocal();
-    return "${dt.day.toString().padLeft(2, '0')} ${_monthName(dt.month)} ${dt.year}, "
-           "${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}";
-  } else if (ts is String) {
+  Future<void> getDeviceLocation() async {
     try {
-      final parsed = int.tryParse(ts);
-      if (parsed != null) {
-        final dt = DateTime.fromMillisecondsSinceEpoch(parsed * 1000).toLocal();
-        return "${dt.day.toString().padLeft(2, '0')} ${_monthName(dt.month)} ${dt.year}, "
-               "${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}";
-      }
+      final snapshot = await dbRef.child('esp-data/$tokenId').get();
+      if (snapshot.exists) {
+        final raw = snapshot.value as Map<dynamic, dynamic>;
+        final sortedKeys = raw.keys.toList()
+          ..sort((a, b) => b.toString().compareTo(a.toString()));
 
-      final dt = DateTime.tryParse(ts)?.toLocal();
-      if (dt != null) {
-        return "${dt.day.toString().padLeft(2, '0')} ${_monthName(dt.month)} ${dt.year}, "
-               "${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}";
+        for (final key in sortedKeys) {
+          final entry = raw[key];
+          if (entry is Map) {
+            final data = Map<String, dynamic>.from(entry);
+            final lat = double.tryParse(data['lat']?.toString() ?? '');
+            final lng = double.tryParse(data['lon']?.toString() ?? '');
+
+            print("🧭 Checking key: $key, lat: $lat, lon: $lng");
+
+            if (lat != null && lng != null) {
+              print("✅ Found device location: $lat, $lng");
+              setState(() {
+                _devicePosition = LatLng(lat, lng);
+              });
+              return;
+            }
+          }
+        }
+      } else {
+        print("⚠️ Data not found at: esp-data/$tokenId");
       }
-    } catch (_) {}
-    return ts;
+    } catch (e) {
+      print("❌ Error reading device location: $e");
+    }
   }
 
-  return "--";
-}
+  void listenDeviceLocation() {
+    dbRef.child('esp-data/$tokenId').onValue.listen((event) {
+      final snapshot = event.snapshot;
+      if (snapshot.exists) {
+        final raw = snapshot.value as Map<dynamic, dynamic>;
+        final sortedKeys = raw.keys.toList()
+          ..sort((a, b) => b.toString().compareTo(a.toString()));
+
+        for (final key in sortedKeys) {
+          final entry = raw[key];
+          if (entry is Map) {
+            final data = Map<String, dynamic>.from(entry);
+            final lat = double.tryParse(data['lat']?.toString() ?? '');
+            final lng = double.tryParse(data['lon']?.toString() ?? '');
+
+            if (lat != null && lng != null) {
+              final newPosition = LatLng(lat, lng);
+
+              // Hanya update jika lokasi berbeda dari sebelumnya
+              if (_devicePosition == null ||
+                  _devicePosition!.latitude != lat ||
+                  _devicePosition!.longitude != lng) {
+                setState(() {
+                  _devicePosition = newPosition;
+                });
+
+                // Pindahkan kamera ke lokasi device
+                _mapController.move(newPosition, _mapController.camera.zoom);
+              }
+              return;
+            }
+          }
+        }
+      }
+    });
+  }
 
 
+  IconData getBatteryIcon(double voltage) {
+    if (voltage >= 4.0) return Icons.battery_full;
+    if (voltage >= 3.9) return Icons.battery_6_bar;
+    if (voltage >= 3.8) return Icons.battery_5_bar;
+    if (voltage >= 3.7) return Icons.battery_4_bar;
+    if (voltage >= 3.6) return Icons.battery_3_bar;
+    if (voltage >= 3.5) return Icons.battery_2_bar;
+    if (voltage >= 3.4) return Icons.battery_1_bar;
+    return Icons.battery_alert;
+  }
+
+  Icon getSignalIcon(int signalStrength) {
+    Color color;
+    if (signalStrength >= 75) {
+      color = Colors.green;
+    } else if (signalStrength >= 50) {
+      color = Colors.lightGreen;
+    } else if (signalStrength >= 25) {
+      color = Colors.orange;
+    } else {
+      color = Colors.red;
+    }
+
+    return Icon(
+      Icons.network_cell,
+      size: 16,
+      color: color,
+    );
+  }
+
+  String formatTimestamp(dynamic ts) {
+    if (ts == null) return "--";
+
+    if (ts is int) {
+      final dt = DateTime.fromMillisecondsSinceEpoch(ts * 1000).toLocal();
+      return "${dt.day.toString().padLeft(2, '0')} ${_monthName(dt.month)} ${dt.year}, "
+            "${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}";
+    } else if (ts is String) {
+      try {
+        final parsed = int.tryParse(ts);
+        if (parsed != null) {
+          final dt = DateTime.fromMillisecondsSinceEpoch(parsed * 1000).toLocal();
+          return "${dt.day.toString().padLeft(2, '0')} ${_monthName(dt.month)} ${dt.year}, "
+                "${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}";
+        }
+
+        final dt = DateTime.tryParse(ts)?.toLocal();
+        if (dt != null) {
+          return "${dt.day.toString().padLeft(2, '0')} ${_monthName(dt.month)} ${dt.year}, "
+                "${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}";
+        }
+      } catch (_) {}
+      return ts;
+    }
+
+    return "--";
+  }
 
   String _monthName(int month) {
     const months = [
@@ -272,16 +268,15 @@ String formatTimestamp(dynamic ts) {
                 Row(
                   children: [
                  CircleAvatar(
-  backgroundColor: const Color(0xFF01AB96),
-  radius: 25,
-  child: Icon(
-    Icons.person,
-    color: const Color.fromARGB(221, 255, 255, 255),
-    size: 30,
-  ),
-),
-
-                    SizedBox(width: 10),
+                  backgroundColor: const Color(0xFF01AB96),
+                  radius: 25, 
+                  child: Icon(
+                    Icons.person,
+                    color: const Color.fromARGB(221, 255, 255, 255),
+                    size: 30,
+                  ),
+                ),
+                SizedBox(width: 10),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -317,7 +312,6 @@ String formatTimestamp(dynamic ts) {
               ],
             ),
           ),
-
           // Map Section
           Stack(
             children: [
