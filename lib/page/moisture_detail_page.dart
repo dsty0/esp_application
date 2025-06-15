@@ -249,75 +249,82 @@ class _MoistureDetailPageState extends State<MoistureDetailPage> {
 
   final reversedData = chartData.reversed.toList();
 
-return Padding(
-  padding: const EdgeInsets.all(4),
-  child: Card(
-    color: Colors.white,
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-    child: Padding(
-      padding: const EdgeInsets.all(12),
-      child: SizedBox(
-        height: 150,
-        child: LineChart(
-          LineChartData(
-          minY: 0,
-          titlesData: FlTitlesData(
-  bottomTitles: AxisTitles(
-    sideTitles: SideTitles(
-      showTitles: true,
-      reservedSize: 28,
-      getTitlesWidget: (value, meta) {
-        final index = value.toInt();
-        if (index >= 0 && index < reversedData.length) {
-          final ts = reversedData[index]['timestamp'] as DateTime;
-          return Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: Text(
-              DateFormat('HH:mm').format(ts),
-              style: GoogleFonts.lexend(fontSize: 10),
+  return Padding(
+    padding: const EdgeInsets.all(4),
+    child: Card(
+      color: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: SizedBox(
+            width: (reversedData.length * 60).toDouble().clamp(300.0, 2000.0),
+            height: 200,
+            child: LineChart(
+              LineChartData(
+                minY: 0,
+                maxY: reversedData
+                    .map<double>((e) => e['soil'])
+                    .reduce((a, b) => a > b ? a : b) +
+                    20, // agar tidak mepet
+                titlesData: FlTitlesData(
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 28,
+                      getTitlesWidget: (value, meta) {
+                        final index = value.toInt();
+                        if (index >= 0 && index < reversedData.length) {
+                          final ts = reversedData[index]['timestamp'] as DateTime;
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              DateFormat('HH:mm').format(ts),
+                              style: GoogleFonts.lexend(fontSize: 10),
+                            ),
+                          );
+                        }
+                        return const SizedBox.shrink();
+                      },
+                    ),
+                  ),
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 28,
+                      getTitlesWidget: (value, meta) {
+                        return Text(
+                          value.toInt().toString(),
+                          style: GoogleFonts.lexend(fontSize: 10),
+                          textAlign: TextAlign.right,
+                        );
+                      },
+                    ),
+                  ),
+                  rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                ),
+                gridData: FlGridData(show: true),
+                lineBarsData: [
+                  LineChartBarData(
+                    spots: List.generate(reversedData.length, (i) {
+                      final soil = reversedData[i]['soil'];
+                      return FlSpot(i.toDouble(), soil);
+                    }),
+                    isCurved: true,
+                    color: const Color(0xFF01AB96),
+                    dotData: FlDotData(show: false),
+                    belowBarData: BarAreaData(show: false),
+                  ),
+                ],
+              ),
             ),
-          );
-        }
-        return const SizedBox.shrink();
-      },
-    ),
-  ),
-  leftTitles: AxisTitles(
-    sideTitles: SideTitles(
-      showTitles: true,
-      reservedSize: 28,
-      getTitlesWidget: (value, meta) {
-        return Text(
-          value.toInt().toString(),
-          style: GoogleFonts.lexend(fontSize: 10),
-          textAlign: TextAlign.right,
-        );
-      },
-    ),
-  ),
-  rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-  topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-),
-
-          gridData: FlGridData(show: true),
-          lineBarsData: [
-            LineChartBarData(
-              spots: List.generate(reversedData.length, (i) {
-                final soil = reversedData[i]['soil'];
-                return FlSpot(i.toDouble(), soil);
-              }),
-              isCurved: true,
-              color: const Color(0xFF01AB96),
-              dotData: FlDotData(show: false),
-              belowBarData: BarAreaData(show: false),
-            ),
-          ],
+          ),
         ),
       ),
     ),
-  ),
-  ),
-);
+  );
 }
 
 Widget buildTable(List<Map<String, dynamic>> tableData) {

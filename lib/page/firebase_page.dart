@@ -6,12 +6,12 @@ import 'package:geolocator/geolocator.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'setting_page.dart';
-import 'temperature_detail_page.dart';
-import 'humidity_detail_page.dart';
-import 'light_detail_page.dart';
-import 'moisture_detail_page.dart';
-import 'info_page.dart';
+import 'package:esp_aplicaton/page/setting_page.dart';
+import 'package:esp_aplicaton/page/temperature_detail_page.dart';
+import 'package:esp_aplicaton/page/humidity_detail_page.dart';
+import 'package:esp_aplicaton/page/light_detail_page.dart';
+import 'package:esp_aplicaton/page/moisture_detail_page.dart';
+import 'package:esp_aplicaton/page/info_page.dart';
 
 String tokenId = "DST-TYL230904";
 
@@ -35,7 +35,8 @@ class _FirebasePageState extends State<FirebasePage> {
     super.initState();
     loginAndListenData();
     getCurrentLocation();
-    getDeviceLocation(); // Ambil posisi device juga
+    // getDeviceLocation(); // Ambil posisi device juga
+    listenDeviceLocation(); // 🔥 Auto-update posisi device
   }
 
   Future<void> loginAndListenData() async {
@@ -101,8 +102,40 @@ Future<void> getDeviceLocation() async {
     final snapshot = await dbRef.child('esp-data/$tokenId').get();
     if (snapshot.exists) {
       final raw = snapshot.value as Map<dynamic, dynamic>;
+      final sortedKeys = raw.keys.toList()
+        ..sort((a, b) => b.toString().compareTo(a.toString()));
 
-      // Urutkan key unixtime dari terbaru ke terlama
+      for (final key in sortedKeys) {
+        final entry = raw[key];
+        if (entry is Map) {
+          final data = Map<String, dynamic>.from(entry);
+          final lat = double.tryParse(data['lat']?.toString() ?? '');
+          final lng = double.tryParse(data['lon']?.toString() ?? '');
+
+          print("🧭 Checking key: $key, lat: $lat, lon: $lng");
+
+          if (lat != null && lng != null) {
+            print("✅ Found device location: $lat, $lng");
+            setState(() {
+              _devicePosition = LatLng(lat, lng);
+            });
+            return;
+          }
+        }
+      }
+    } else {
+      print("⚠️ Data not found at: esp-data/$tokenId");
+    }
+  } catch (e) {
+    print("❌ Error reading device location: $e");
+  }
+}
+
+void listenDeviceLocation() {
+  dbRef.child('esp-data/$tokenId').onValue.listen((event) {
+    final snapshot = event.snapshot;
+    if (snapshot.exists) {
+      final raw = snapshot.value as Map<dynamic, dynamic>;
       final sortedKeys = raw.keys.toList()
         ..sort((a, b) => b.toString().compareTo(a.toString()));
 
@@ -114,18 +147,27 @@ Future<void> getDeviceLocation() async {
           final lng = double.tryParse(data['lon']?.toString() ?? '');
 
           if (lat != null && lng != null) {
-            setState(() {
-              _devicePosition = LatLng(lat, lng);
-            });
-            return; // Stop jika sudah ketemu data valid
+            final newPosition = LatLng(lat, lng);
+
+            // Hanya update jika lokasi berbeda dari sebelumnya
+            if (_devicePosition == null ||
+                _devicePosition!.latitude != lat ||
+                _devicePosition!.longitude != lng) {
+              setState(() {
+                _devicePosition = newPosition;
+              });
+
+              // Pindahkan kamera ke lokasi device
+              _mapController.move(newPosition, _mapController.camera.zoom);
+            }
+            return;
           }
         }
       }
     }
-  } catch (e) {
-    print("❌ Error reading device location: $e");
-  }
+  });
 }
+
 
 
 
@@ -326,44 +368,71 @@ String formatTimestamp(dynamic ts) {
             ],
           ),
 
-          // Data Header
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Data Sensor',
-                      style: GoogleFonts.lexend(
-                        fontSize: 16,
-                        color: const Color(0xDD181818),
-                      ),
-                    ),
-                    SizedBox(height: 1),
-                    Container(
-                      height: 2,
-                      width: 40,
-                      color: const Color(0xFF01AB96),
-                    ),
-                  ],
-                ),
-Text(
-  sortedKeys.isNotEmpty
-      ? 'Last updated : ${formatTimestamp(sortedKeys.first)}'
+Padding(
+  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+  child: Row(
+    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Data Sensor',
+            style: GoogleFonts.lexend(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: const Color(0xDD181818),
+            ),
+          ),
+          SizedBox(height: 2),
+          Container(
+            height: 2,
+            width: 40,
+            color: const Color(0xFF01AB96),
+          ),
+        ],
+      ),
+      Row(
+        children: [
+          Text(
+            sortedKeys.isNotEmpty
+                ? "Updated: ${formatTimestamp(sortedKeys.first)}"
+                : '--',
+            style: GoogleFonts.lexend(
+              fontSize: 12,
+              color: const Color(0xDD181818),
+            ),
+          ),
+                    SizedBox(width: 12),
+          Icon(Icons.battery_full, size: 16, color: const Color(0xFFCCCCCC)),
+          SizedBox(width: 4),
+          Text(
+            "${latest['battery'] ?? '--'} V",
+            style: GoogleFonts.lexend(
+              fontSize: 12,
+              color: const Color(0xDD181818),
+            ),
+          ),
+          SizedBox(width: 12),
+          Icon(Icons.network_cell, size: 16, color: const Color(0xFFCCCCCC)),
+          SizedBox(width: 4),
+          Text(
+            "${latest['signal'] ?? '--'}",
+            style: GoogleFonts.lexend(
+              fontSize: 12,
+              color: const Color(0xDD181818),
+            ),
+          ),
+                    SizedBox(width: 12),
 
-      : 'Last updated : --',
-  style: GoogleFonts.lexend(
-    fontSize: 12,
-    color: const Color(0xDD181818),
+        ],
+      ),
+    ],
   ),
 ),
 
-              ],
-            ),
-          ),
+
 
           // Data Cards
           Expanded(
@@ -404,7 +473,7 @@ Navigator.push(
 
   },
 ),
-               sensorCard("Light", "${latest['cahaya'] ?? '--'} Lux",
+               sensorCard("Light Int", "${latest['cahaya'] ?? '--'} Lux",
   "lib/assets/images/light.png", 
   formatTimestamp(latest['timestamp']),
   onTap: () {
@@ -437,25 +506,25 @@ Navigator.push(
           ),
         ],
       ),
-      bottomNavigationBar: BottomNavigationBar(
-  currentIndex: 1,
-  onTap: (index) {
-    if (index == 0) {
-      // Do nothing or go to home
-    } else if (index == 1) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => InfoPage()),
-      );
-    }
-  },
-  items: const [
-    BottomNavigationBarItem(
-      icon: Icon(Icons.home, color: Color(0xFF01AB96)), label: 'Home'),
-    BottomNavigationBarItem(
-      icon: Icon(Icons.info_sharp, color: Color.fromARGB(255, 75, 75, 75)), label: 'Info'),
-  ],
-),
+//       bottomNavigationBar: BottomNavigationBar(
+//   currentIndex: 1,
+//   onTap: (index) {
+//     if (index == 0) {
+//       // Do nothing or go to home
+//     } else if (index == 1) {
+//       Navigator.push(
+//         context,
+//         MaterialPageRoute(builder: (context) => InfoPage()),
+//       );
+//     }
+//   },
+//   items: const [
+//     BottomNavigationBarItem(
+//       icon: Icon(Icons.home, color: Color(0xFF01AB96)), label: 'Home'),
+//     BottomNavigationBarItem(
+//       icon: Icon(Icons.info_sharp, color: Color.fromARGB(255, 75, 75, 75)), label: 'Info'),
+//   ],
+// ),
 
     );
   }
